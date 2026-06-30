@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, isSupabaseReady } from "@/lib/supabase";
-import { setCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
+import { loginIdToEmail } from "@/lib/loginId";
 
 // ログイン画面（トップページ）
 export default function LoginPage() {
@@ -27,29 +28,22 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    // agencies テーブルから、login_id が一致する1件を探す
-    const { data, error: dbError } = await supabase
-      .from("agencies")
-      .select("id, name, login_id, password_hash, role")
-      .eq("login_id", loginId)
-      .single();
+    // ログインIDを内部メールに変換して、Supabase Auth にログインを依頼する
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: loginIdToEmail(loginId),
+      password,
+    });
 
+    if (authError) {
+      setLoading(false);
+      setError("メールアドレスまたはパスワードが違います。");
+      return;
+    }
+
+    // ログイン成功 → 権限を調べて、運営なら/admin・代理店なら/dashboardへ
+    const current = await getCurrentUser();
     setLoading(false);
-
-    if (dbError || !data) {
-      setError("ログインIDが見つかりません。");
-      return;
-    }
-
-    // ⚠️ MVP：パスワードを平文で比較しています（本番はNG）
-    if (data.password_hash !== password) {
-      setError("パスワードが違います。");
-      return;
-    }
-
-    // ログイン成功 → ユーザーを保存して、役割に応じた画面へ
-    setCurrentUser({ id: data.id, name: data.name, role: data.role });
-    if (data.role === "admin") {
+    if (current?.role === "admin") {
       router.push("/admin");
     } else {
       router.push("/dashboard");
@@ -104,7 +98,9 @@ export default function LoginPage() {
         </button>
 
         <p className="text-base text-slate-400 mt-8 text-center">
-          テスト用：agency01 / agency123（代理店）・admin / admin123（運営）
+          テスト用：agency01 / Agency12345!（代理店）
+          <br />
+          admin / Admin12345!（運営）
         </p>
       </form>
       </main>

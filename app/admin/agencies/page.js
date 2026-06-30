@@ -8,13 +8,13 @@ import { getCurrentUser } from "@/lib/auth";
 import Header from "@/components/Header";
 
 // 代理店アカウント管理画面（運営本部だけが使える）
+// アカウント作成・削除は秘密の鍵が必要なので、サーバーAPI(/api/admin/agencies)経由で行う。
 export default function AgenciesPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 新規アカウント追加フォームの入力内容
   const [form, setForm] = useState({
     name: "",
     login_id: "",
@@ -25,27 +25,40 @@ export default function AgenciesPage() {
   const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
-    const current = getCurrentUser();
-    if (!current) {
-      router.push("/");
-      return;
-    }
-    if (current.role !== "admin") {
-      router.push("/dashboard");
-      return;
-    }
-    setUser(current);
-    loadAgencies();
+    getCurrentUser().then((current) => {
+      if (!current) {
+        router.push("/");
+        return;
+      }
+      if (current.role !== "admin") {
+        router.push("/dashboard");
+        return;
+      }
+      setUser(current);
+      loadAgencies();
+    });
   }, []);
+
+  // ログイン中のアクセストークンを付けてAPIを呼ぶ（本人確認のため）
+  async function authedFetch(url, options = {}) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+    });
+  }
 
   async function loadAgencies() {
     setLoading(true);
-    // パスワードは取得しない（一覧に出さない）
-    const { data } = await supabase
-      .from("agencies")
-      .select("id, name, login_id, role, created_at")
-      .order("created_at", { ascending: true });
-    setAgencies(data || []);
+    const res = await authedFetch("/api/admin/agencies");
+    const json = await res.json();
+    setAgencies(json.agencies || []);
     setLoading(false);
   }
 
@@ -53,22 +66,17 @@ export default function AgenciesPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // アカウントを追加する
   async function handleAdd(event) {
     event.preventDefault();
     setSaving(true);
-    // ⚠️ MVP：パスワードを平文で保存しています（本番はハッシュ化が必須）
-    const { error } = await supabase.from("agencies").insert({
-      name: form.name,
-      login_id: form.login_id,
-      password_hash: form.password,
-      role: form.role,
+    const res = await authedFetch("/api/admin/agencies", {
+      method: "POST",
+      body: JSON.stringify(form),
     });
     setSaving(false);
-
-    if (error) {
-      // login_id がすでに使われている場合などはここに来る
-      alert("追加に失敗しました：" + error.message);
+    if (!res.ok) {
+      const json = await res.json();
+      alert("追加に失敗しました：" + json.error);
       return;
     }
     setForm({ name: "", login_id: "", password: "", role: "agency" });
@@ -76,11 +84,14 @@ export default function AgenciesPage() {
   }
 
   async function deleteAgency(id) {
-    const { error } = await supabase.from("agencies").delete().eq("id", id);
+    const res = await authedFetch("/api/admin/agencies", {
+      method: "DELETE",
+      body: JSON.stringify({ id }),
+    });
     setDeletingId(null);
-    if (error) {
-      // この代理店が企業を登録済みだと、外部キー制約で削除できないことがある
-      alert("削除できませんでした：" + error.message);
+    if (!res.ok) {
+      const json = await res.json();
+      alert("削除できませんでした：" + json.error);
       return;
     }
     loadAgencies();
@@ -90,7 +101,6 @@ export default function AgenciesPage() {
     <div className="min-h-screen">
       <Header user={user} />
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* 画面切り替えのリンク */}
         <nav className="flex gap-4 mb-6 text-sm">
           <Link href="/admin" className="text-navy underline">
             ← 企業一覧へ戻る
@@ -127,13 +137,13 @@ export default function AgenciesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">パスワード</label>
+            <label className="block text-sm font-medium mb-1">初期パスワード</label>
             <input
               required
               value={form.password}
               onChange={(e) => updateField("password", e.target.value)}
               className="w-full border rounded px-3 py-2"
-              placeholder="初期パスワード"
+              placeholder="8文字以上を推奨"
             />
           </div>
           <div>
@@ -200,7 +210,7 @@ export default function AgenciesPage() {
                       ) : (
                         <button
                           onClick={() => setDeletingId(a.id)}
-                          className="text-red-600 underline"
+                          className="text-red-600 underline disabled:opacity-40"
                           disabled={a.id === user?.id}
                           title={a.id === user?.id ? "ログイン中の自分は削除できません" : ""}
                         >

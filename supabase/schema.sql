@@ -1,15 +1,18 @@
 -- =====================================================================
--- TELEMO 営業重複管理ツール  データベース設計
--- 使い方：Supabaseの「SQL Editor」にこの全文を貼り付けて Run するだけ
+-- 営業重複管理ツール  データベース設計（Supabase Auth対応版）
+--
+-- ポイント：
+--  - ログインID/パスワードは agencies に持たない。Supabase Auth が安全に管理する。
+--  - agencies.id は、Supabase Auth のユーザーid（auth.users.id）と一致させる。
+--  - デモ用アカウント・企業は、scripts/seed.mjs（秘密鍵で実行）で投入する。
 -- =====================================================================
 
 
--- ① agencies（アカウント：代理店・運営）---------------------------------
+-- ① agencies（アカウントの付帯情報：名前と権限）-----------------------
+--   id は auth.users(id) を参照。＝「このアプリ上の名前と役割」を持つ表。
 create table agencies (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
-  login_id text not null unique,
-  password_hash text not null,        -- ⚠️ MVPは平文。本番は Supabase Auth へ
   role text not null default 'agency', -- 'admin' か 'agency'
   created_at timestamptz not null default now()
 );
@@ -44,30 +47,3 @@ create table search_logs (
   result text,
   created_at timestamptz not null default now()
 );
-
-
--- =====================================================================
--- デモ用データ（最初の動作確認用。あとで消してOK）
--- =====================================================================
-
--- アカウント2つ（運営1・代理店1）
-insert into agencies (name, login_id, password_hash, role) values
-  ('TELEMO運営本部', 'admin',   'admin123',  'admin'),
-  ('サンプル代理店A', 'agency01', 'agency123', 'agency');
-
--- サンプル企業3社（agency01 が登録したことにする）
-insert into companies
-  (company_name, normalized_company_name, phone_number, normalized_phone_number,
-   representative_name, meeting_date, current_status, delivery_flag, agency_id)
-values
-  ('株式会社TELEMO', 'telemo', '03-1234-5678', '0312345678',
-   'telemo太郎', current_date - 14, '商談', '未着手',
-   (select id from agencies where login_id = 'agency01')),
-
-  ('サンプル商事', 'サンプル商事', '06-1111-2222', '0611112222',
-   '見本花子', current_date - 170, 'テスト', '納品',
-   (select id from agencies where login_id = 'agency01')),
-
-  ('テスト工業', 'テスト工業', '052-333-4444', '0523334444',
-   '試験次郎', current_date - 60, '商談', '未着手',
-   (select id from agencies where login_id = 'agency01'));

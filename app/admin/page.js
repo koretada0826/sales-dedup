@@ -27,17 +27,18 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
-    const current = getCurrentUser();
-    if (!current) {
-      router.push("/");
-      return;
-    }
-    if (current.role !== "admin") {
-      router.push("/dashboard"); // 運営でなければ追い返す
-      return;
-    }
-    setUser(current);
-    loadAll();
+    getCurrentUser().then((current) => {
+      if (!current) {
+        router.push("/");
+        return;
+      }
+      if (current.role !== "admin") {
+        router.push("/dashboard"); // 運営でなければ追い返す
+        return;
+      }
+      setUser(current);
+      loadAll();
+    });
   }, []);
 
   // 全企業＋登録した代理店名を取ってくる

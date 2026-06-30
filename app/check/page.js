@@ -4,11 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  normalizeCompanyName,
-  normalizePhoneNumber,
-  judgeCompanies,
-} from "@/lib/judge";
 import { FORBIDDEN_GROUPS } from "@/lib/constants";
 import Header from "@/components/Header";
 import ResultCard from "@/components/ResultCard";
@@ -29,12 +24,13 @@ export default function CheckPage() {
   const [matched, setMatched] = useState(null);
 
   useEffect(() => {
-    const current = getCurrentUser();
-    if (!current) {
-      router.push("/");
-      return;
-    }
-    setUser(current);
+    getCurrentUser().then((current) => {
+      if (!current) {
+        router.push("/");
+        return;
+      }
+      setUser(current);
+    });
   }, []);
 
   async function handleSearch(event) {
@@ -47,41 +43,36 @@ export default function CheckPage() {
     setJudgement(null);
     setMatched(null);
 
-    // 入力をそうじする（表記ゆれを吸収）
-    const normName = normalizeCompanyName(companyName);
-    const normPhone = normalizePhoneNumber(phoneNumber);
+    // 検索はサーバー側API(/api/search)に任せる。
+    // ブラウザは判定結果＋最小限の情報だけ受け取る（他社の生データは届かない）。
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    // 入力された項目に対して「一致する企業」を探す条件を組み立てる
-    // 電話番号・企業名は「そうじした版で完全一致」、代表者名・住所は「部分一致(ilike)」
-    // ※ PostgREST の .or() を壊さないよう、入力からカンマを除いておく
-    const safe = (value) => value.replace(/,/g, " ");
-    const conditions = [];
-    if (normPhone) conditions.push(`normalized_phone_number.eq.${normPhone}`);
-    if (normName) conditions.push(`normalized_company_name.eq.${normName}`);
-    if (representativeName) conditions.push(`representative_name.ilike.%${safe(representativeName)}%`);
-    if (address) conditions.push(`address.ilike.%${safe(address)}%`);
+    const res = await fetch("/api/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({
+        companyName,
+        phoneNumber,
+        representativeName,
+        address,
+      }),
+    });
 
-    const { data } = await supabase
-      .from("companies")
-      .select("*")
-      .or(conditions.join(","))
-      .order("meeting_date", { ascending: false });
-
-    // ヒットした全件をまとめて判定し、「一番厳しい結果」を採用する（重複の見落とし防止）
-    const { judgement: result, company: found } = judgeCompanies(data || []);
-
-    setMatched(found);
-    setJudgement(result);
     setSearching(false);
 
-    // 検索履歴を残す（誰が・何を検索して・どう判定されたか）
-    await supabase.from("search_logs").insert({
-      agency_id: user.id,
-      search_company_name: companyName,
-      search_phone_number: phoneNumber,
-      search_address: address,
-      result: result.result,
-    });
+    if (!res.ok) {
+      alert("検索に失敗しました。もう一度お試しください。");
+      return;
+    }
+
+    const json = await res.json();
+    setJudgement({ result: json.result, message: json.message });
+    setMatched(json.company);
   }
 
   return (

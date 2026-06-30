@@ -7,8 +7,8 @@ import { logout } from "@/lib/auth";
 export default function Header({ user }) {
   const router = useRouter();
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     router.push("/");
   }
 

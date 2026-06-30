@@ -16,13 +16,14 @@ export default function DashboardPage() {
 
   // 画面が表示されたとき（最初の1回）に実行される
   useEffect(() => {
-    const current = getCurrentUser();
-    if (!current) {
-      router.push("/"); // ログインしていなければログイン画面へ
-      return;
-    }
-    setUser(current);
-    loadMyCompanies(current.id);
+    getCurrentUser().then((current) => {
+      if (!current) {
+        router.push("/"); // ログインしていなければログイン画面へ
+        return;
+      }
+      setUser(current);
+      loadMyCompanies(current.id);
+    });
   }, []);
 
   // 自分が登録した企業だけを取ってくる
