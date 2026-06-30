@@ -46,6 +46,17 @@ create table search_logs (
 );
 
 
+-- ④ app_settings（運営が切り替える設定）--------------------------------
+create table app_settings (
+  key text primary key,
+  value boolean not null default false
+);
+
+-- 初期設定：検索結果に担当代理店名を見せるか（最初は false=見せない）
+insert into app_settings (key, value) values
+  ('show_agency_name_to_agencies', false);
+
+
 -- =====================================================================
 -- デモ用データ（最初の動作確認用。あとで消してOK）
 -- =====================================================================

@@ -57,46 +57,57 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex flex-col">
+      {/* ダッシュボードと同じ紺色の上部バー */}
+      <header className="bg-navy text-white px-8 py-5">
+        <div className="font-bold text-2xl">営業重複管理ツール</div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4">
       <form
         onSubmit={handleLogin}
-        className="bg-white shadow-md rounded-lg p-8 w-full max-w-sm"
+        className="bg-white shadow-xl rounded-3xl p-14 w-full max-w-2xl"
       >
-        <h1 className="text-xl font-bold text-navy mb-1">ログイン</h1>
-        <p className="text-sm text-slate-500 mb-6">
-          TELEMO 営業重複管理ツール
+        <h1 className="text-4xl font-bold text-navy mb-3">ログイン</h1>
+        <p className="text-xl text-slate-500 mb-10">
+          営業重複管理ツール
         </p>
 
-        <label className="block text-sm font-medium mb-1">ログインID</label>
+        <label className="block text-lg font-medium mb-2">ログインID</label>
         <input
           type="text"
           value={loginId}
           onChange={(e) => setLoginId(e.target.value)}
-          className="w-full border rounded px-3 py-2 mb-4"
+          className="w-full border rounded-xl px-5 py-4 text-lg mb-6"
           placeholder="agency01"
         />
 
-        <label className="block text-sm font-medium mb-1">パスワード</label>
+        <label className="block text-lg font-medium mb-2">パスワード</label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded px-3 py-2 mb-4"
+          className="w-full border rounded-xl px-5 py-4 text-lg mb-6"
           placeholder="••••••"
         />
 
         {error && (
-          <p className="text-red-600 text-sm mb-4">{error}</p>
+          <p className="text-red-600 text-lg mb-6">{error}</p>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-navy text-white py-2 rounded hover:opacity-90 disabled:opacity-50"
+          className="w-full bg-navy text-white text-xl font-medium py-4 rounded-xl hover:opacity-90 disabled:opacity-50"
         >
           {loading ? "確認中..." : "ログイン"}
         </button>
+
+        <p className="text-base text-slate-400 mt-8 text-center">
+          テスト用：agency01 / agency123（代理店）・admin / admin123（運営）
+        </p>
       </form>
-    </main>
+      </main>
+    </div>
   );
 }

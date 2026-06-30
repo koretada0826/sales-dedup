@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/auth";
-import { normalizeCompanyName, normalizePhoneNumber } from "@/lib/judge";
+import {
+  normalizeCompanyName,
+  normalizePhoneNumber,
+  judgeProposalAvailability,
+} from "@/lib/judge";
 import { STATUS_OPTIONS, DELIVERY_OPTIONS } from "@/lib/constants";
 import Header from "@/components/Header";
 
@@ -26,6 +30,8 @@ export default function RegisterPage() {
   });
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  // 既に登録済みの企業が見つかったときに、その一覧をここに入れて警告を出す
+  const [duplicates, setDuplicates] = useState(null);
 
   useEffect(() => {
     const current = getCurrentUser();
@@ -41,12 +47,37 @@ export default function RegisterPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // 登録ボタンを押したとき
+  // 登録ボタンを押したとき：まず「すでに登録済みか」をチェックする
   async function handleSubmit(event) {
     event.preventDefault();
-    setSaving(true);
 
-    // DBに入れるデータを組み立てる（そうじした版も一緒に保存）
+    const normName = normalizeCompanyName(form.company_name);
+    const normPhone = normalizePhoneNumber(form.phone_number);
+
+    // 電話番号 or 企業名（そうじ版）が一致する既存企業を探す
+    const conditions = [];
+    if (normPhone) conditions.push(`normalized_phone_number.eq.${normPhone}`);
+    if (normName) conditions.push(`normalized_company_name.eq.${normName}`);
+
+    if (conditions.length > 0) {
+      const { data } = await supabase
+        .from("companies")
+        .select("*")
+        .or(conditions.join(","));
+      if (data && data.length > 0) {
+        // 既存があれば、いったん登録を止めて警告を表示する
+        setDuplicates(data);
+        return;
+      }
+    }
+
+    // 重複がなければそのまま登録
+    await insertCompany();
+  }
+
+  // 実際にDBへ登録する処理（重複チェックを通過 or「それでも登録」したとき）
+  async function insertCompany() {
+    setSaving(true);
     const newCompany = {
       ...form,
       normalized_company_name: normalizeCompanyName(form.company_name),
@@ -61,6 +92,7 @@ export default function RegisterPage() {
       alert("登録に失敗しました：" + error.message);
       return;
     }
+    setDuplicates(null);
     setDone(true);
   }
 
@@ -107,6 +139,42 @@ export default function RegisterPage() {
       <Header user={user} />
       <main className="max-w-xl mx-auto px-4 py-8">
         <h1 className="text-xl font-bold text-navy mb-6">企業を登録</h1>
+
+        {/* すでに登録済みの企業が見つかったときの警告 */}
+        {duplicates && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-900 rounded p-5 mb-6">
+            <p className="font-bold mb-2">
+              ⚠️ この企業はすでに登録されている可能性があります（{duplicates.length}件）
+            </p>
+            <ul className="text-sm space-y-2 mb-4">
+              {duplicates.map((c) => {
+                const judgement = judgeProposalAvailability(c);
+                return (
+                  <li key={c.id} className="border-t border-yellow-200 pt-2">
+                    {c.company_name}（{c.phone_number || "電話未登録"}） / 商談日：
+                    {c.meeting_date} / ステータス：{c.current_status} /
+                    <span className="font-bold"> 提案可否：{judgement.result}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex gap-3">
+              <button
+                onClick={insertCompany}
+                disabled={saving}
+                className="bg-yellow-600 text-white px-4 py-2 rounded hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? "登録中..." : "それでも登録する"}
+              </button>
+              <button
+                onClick={() => setDuplicates(null)}
+                className="border border-yellow-600 text-yellow-800 px-4 py-2 rounded"
+              >
+                やめる
+              </button>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-4">
           <Field label="企業名（必須）">

@@ -14,7 +14,7 @@ export default function Header({ user }) {
 
   return (
     <header className="bg-navy text-white px-6 py-4 flex items-center justify-between">
-      <div className="font-bold text-lg">TELEMO 営業重複管理ツール</div>
+      <div className="font-bold text-lg">営業重複管理ツール</div>
       <div className="flex items-center gap-4 text-sm">
         {user && (
           <span>

@@ -7,8 +7,10 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   normalizeCompanyName,
   normalizePhoneNumber,
-  judgeProposalAvailability,
+  judgeCompanies,
 } from "@/lib/judge";
+import { FORBIDDEN_GROUPS } from "@/lib/constants";
+import { getShowAgencyName } from "@/lib/settings";
 import Header from "@/components/Header";
 import ResultCard from "@/components/ResultCard";
 
@@ -19,11 +21,15 @@ export default function CheckPage() {
 
   const [companyName, setCompanyName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [representativeName, setRepresentativeName] = useState("");
+  const [address, setAddress] = useState("");
   const [searching, setSearching] = useState(false);
 
   // 検索結果：判定（judgement）と、見つかった企業（matched）
   const [judgement, setJudgement] = useState(null);
   const [matched, setMatched] = useState(null);
+  // 運営の設定：検索結果に担当代理店名を見せるか
+  const [showAgencyName, setShowAgencyName] = useState(false);
 
   useEffect(() => {
     const current = getCurrentUser();
@@ -32,12 +38,14 @@ export default function CheckPage() {
       return;
     }
     setUser(current);
+    // 「代理店名を見せるか」の設定を読み込んでおく
+    getShowAgencyName().then(setShowAgencyName);
   }, []);
 
   async function handleSearch(event) {
     event.preventDefault();
-    if (!companyName && !phoneNumber) {
-      alert("企業名か電話番号のどちらかを入力してください。");
+    if (!companyName && !phoneNumber && !representativeName && !address) {
+      alert("いずれか1つ以上を入力してください。");
       return;
     }
     setSearching(true);
@@ -48,22 +56,26 @@ export default function CheckPage() {
     const normName = normalizeCompanyName(companyName);
     const normPhone = normalizePhoneNumber(phoneNumber);
 
-    // 「電話番号が一致」または「企業名が一致」する企業を探す条件を組み立てる
+    // 入力された項目に対して「一致する企業」を探す条件を組み立てる
+    // 電話番号・企業名は「そうじした版で完全一致」、代表者名・住所は「部分一致(ilike)」
+    // ※ PostgREST の .or() を壊さないよう、入力からカンマを除いておく
+    const safe = (value) => value.replace(/,/g, " ");
     const conditions = [];
     if (normPhone) conditions.push(`normalized_phone_number.eq.${normPhone}`);
     if (normName) conditions.push(`normalized_company_name.eq.${normName}`);
+    if (representativeName) conditions.push(`representative_name.ilike.%${safe(representativeName)}%`);
+    if (address) conditions.push(`address.ilike.%${safe(address)}%`);
 
     const { data } = await supabase
       .from("companies")
-      .select("*")
+      .select("*, agencies(name)")
       .or(conditions.join(","))
       .order("meeting_date", { ascending: false });
 
-    // 見つかった中の最新の1件を判定対象にする（なければ undefined）
-    const found = data && data.length > 0 ? data[0] : undefined;
-    const result = judgeProposalAvailability(found);
+    // ヒットした全件をまとめて判定し、「一番厳しい結果」を採用する（重複の見落とし防止）
+    const { judgement: result, company: found } = judgeCompanies(data || []);
 
-    setMatched(found || null);
+    setMatched(found);
     setJudgement(result);
     setSearching(false);
 
@@ -72,6 +84,7 @@ export default function CheckPage() {
       agency_id: user.id,
       search_company_name: companyName,
       search_phone_number: phoneNumber,
+      search_address: address,
       result: result.result,
     });
   }
@@ -81,6 +94,31 @@ export default function CheckPage() {
       <Header user={user} />
       <main className="max-w-xl mx-auto px-4 py-8">
         <h1 className="text-xl font-bold text-navy mb-6">営業前チェック</h1>
+
+        {/* 提案禁止グループのお知らせ（常時表示）。リストが空なら何も出さない */}
+        {FORBIDDEN_GROUPS.length > 0 && (
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-800 rounded p-4 mb-6">
+            <p className="font-bold mb-2">⚠️ 提案禁止グループのお知らせ</p>
+            <ul className="space-y-2">
+              {FORBIDDEN_GROUPS.map((group) => (
+                <li key={group.name}>
+                  <span className="font-medium">{group.name}</span>
+                  への提案は現在禁止となっております。
+                  {group.url && (
+                    <a
+                      href={group.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-red-700 underline break-all ml-1"
+                    >
+                      {group.url}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <form onSubmit={handleSearch} className="bg-white rounded-lg shadow p-6 space-y-4 mb-6">
           <div>
@@ -101,6 +139,24 @@ export default function CheckPage() {
               placeholder="株式会社〇〇"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">代表者名</label>
+            <input
+              value={representativeName}
+              onChange={(e) => setRepresentativeName(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+              placeholder="山田 太郎"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">住所</label>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+              placeholder="東京都〇〇区..."
+            />
+          </div>
           <button
             type="submit"
             disabled={searching}
@@ -111,7 +167,13 @@ export default function CheckPage() {
         </form>
 
         {/* 判定結果があれば表示する */}
-        {judgement && <ResultCard judgement={judgement} company={matched} />}
+        {judgement && (
+          <ResultCard
+            judgement={judgement}
+            company={matched}
+            showAgencyName={showAgencyName}
+          />
+        )}
       </main>
     </div>
   );

@@ -2,7 +2,7 @@ import "./globals.css";
 
 // 全ページ共通の枠（タイトルなど）
 export const metadata = {
-  title: "TELEMO 営業重複管理ツール",
+  title: "営業重複管理ツール",
   description: "販売代理店の営業先重複を防ぐための管理システム",
 };
 
