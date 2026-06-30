@@ -1,0 +1,16 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next
+/out
+
+# production
+/build
+
+# misc
+.DS_Store
+
+# 秘密の金庫（絶対にGitHubに上げない）
+.env.local
+.env*.local
