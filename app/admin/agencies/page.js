@@ -23,6 +23,9 @@ export default function AgenciesPage() {
   });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  // パスワード再設定中のアカウントidと、入力中の新パスワード
+  const [resettingId, setResettingId] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     getCurrentUser().then((current) => {
@@ -95,6 +98,21 @@ export default function AgenciesPage() {
       return;
     }
     loadAgencies();
+  }
+
+  async function resetPassword(id) {
+    const res = await authedFetch("/api/admin/agencies", {
+      method: "PATCH",
+      body: JSON.stringify({ id, password: newPassword }),
+    });
+    if (!res.ok) {
+      const json = await res.json();
+      alert("変更できませんでした：" + json.error);
+      return;
+    }
+    setResettingId(null);
+    setNewPassword("");
+    alert("パスワードを変更しました。");
   }
 
   return (
@@ -191,7 +209,32 @@ export default function AgenciesPage() {
                       {a.role === "admin" ? "運営本部" : "販売代理店"}
                     </td>
                     <td className="px-4 py-2">
-                      {deletingId === a.id ? (
+                      {resettingId === a.id ? (
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="新しいパスワード(8文字以上)"
+                            className="border rounded px-2 py-1 text-xs w-48"
+                          />
+                          <button
+                            onClick={() => resetPassword(a.id)}
+                            className="bg-navy text-white px-2 py-1 rounded text-xs"
+                          >
+                            保存
+                          </button>
+                          <button
+                            onClick={() => {
+                              setResettingId(null);
+                              setNewPassword("");
+                            }}
+                            className="border px-2 py-1 rounded text-xs"
+                          >
+                            やめる
+                          </button>
+                        </span>
+                      ) : deletingId === a.id ? (
                         <span className="flex items-center gap-2">
                           <span className="text-red-700">削除しますか？</span>
                           <button
@@ -208,14 +251,25 @@ export default function AgenciesPage() {
                           </button>
                         </span>
                       ) : (
-                        <button
-                          onClick={() => setDeletingId(a.id)}
-                          className="text-red-600 underline disabled:opacity-40"
-                          disabled={a.id === user?.id}
-                          title={a.id === user?.id ? "ログイン中の自分は削除できません" : ""}
-                        >
-                          削除
-                        </button>
+                        <span className="flex items-center gap-3">
+                          <button
+                            onClick={() => {
+                              setResettingId(a.id);
+                              setNewPassword("");
+                            }}
+                            className="text-navy underline"
+                          >
+                            パスワード再設定
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(a.id)}
+                            className="text-red-600 underline disabled:opacity-40"
+                            disabled={a.id === user?.id}
+                            title={a.id === user?.id ? "ログイン中の自分は削除できません" : ""}
+                          >
+                            削除
+                          </button>
+                        </span>
                       )}
                     </td>
                   </tr>

@@ -111,3 +111,31 @@ export async function DELETE(request) {
   }
   return NextResponse.json({ ok: true });
 }
+
+// パスワード再設定（運営が任意のアカウントの新しいパスワードを設定する）
+export async function PATCH(request) {
+  const admin = await requireAdmin(request);
+  if (!admin) {
+    return NextResponse.json({ error: "権限がありません" }, { status: 403 });
+  }
+
+  const { id, password } = await request.json();
+  if (!id || !password) {
+    return NextResponse.json({ error: "未入力の項目があります" }, { status: 400 });
+  }
+  if (password.length < 8) {
+    return NextResponse.json(
+      { error: "パスワードは8文字以上にしてください" },
+      { status: 400 }
+    );
+  }
+
+  // Auth 側のパスワードを更新する
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+    password,
+  });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+  return NextResponse.json({ ok: true });
+}
