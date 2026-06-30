@@ -10,7 +10,6 @@ import {
   judgeCompanies,
 } from "@/lib/judge";
 import { FORBIDDEN_GROUPS } from "@/lib/constants";
-import { getShowAgencyName } from "@/lib/settings";
 import Header from "@/components/Header";
 import ResultCard from "@/components/ResultCard";
 
@@ -28,8 +27,6 @@ export default function CheckPage() {
   // 検索結果：判定（judgement）と、見つかった企業（matched）
   const [judgement, setJudgement] = useState(null);
   const [matched, setMatched] = useState(null);
-  // 運営の設定：検索結果に担当代理店名を見せるか
-  const [showAgencyName, setShowAgencyName] = useState(false);
 
   useEffect(() => {
     const current = getCurrentUser();
@@ -38,8 +35,6 @@ export default function CheckPage() {
       return;
     }
     setUser(current);
-    // 「代理店名を見せるか」の設定を読み込んでおく
-    getShowAgencyName().then(setShowAgencyName);
   }, []);
 
   async function handleSearch(event) {
@@ -68,7 +63,7 @@ export default function CheckPage() {
 
     const { data } = await supabase
       .from("companies")
-      .select("*, agencies(name)")
+      .select("*")
       .or(conditions.join(","))
       .order("meeting_date", { ascending: false });
 
@@ -167,13 +162,7 @@ export default function CheckPage() {
         </form>
 
         {/* 判定結果があれば表示する */}
-        {judgement && (
-          <ResultCard
-            judgement={judgement}
-            company={matched}
-            showAgencyName={showAgencyName}
-          />
-        )}
+        {judgement && <ResultCard judgement={judgement} company={matched} />}
       </main>
     </div>
   );

@@ -19,8 +19,7 @@ const STYLES = {
   },
 };
 
-// showAgencyName が true のときだけ「担当代理店名」を表示する（運営の設定で制御）
-export default function ResultCard({ judgement, company, showAgencyName }) {
+export default function ResultCard({ judgement, company }) {
   // judgement = { result, message }
   const style = STYLES[judgement.result];
 
@@ -43,9 +42,6 @@ export default function ResultCard({ judgement, company, showAgencyName }) {
           <li>現在ステータス：{company.current_status}</li>
           {judgement.result === "NG" && (
             <li>納品フラグ：{company.delivery_flag}</li>
-          )}
-          {showAgencyName && company.agencies?.name && (
-            <li>担当代理店：{company.agencies.name}</li>
           )}
         </ul>
       )}

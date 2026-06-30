@@ -11,7 +11,6 @@ import {
   normalizePhoneNumber,
 } from "@/lib/judge";
 import { STATUS_OPTIONS, DELIVERY_OPTIONS } from "@/lib/constants";
-import { getShowAgencyName, setShowAgencyName } from "@/lib/settings";
 import Header from "@/components/Header";
 
 // 運営管理画面（運営本部だけが見れる。全企業の一覧・編集・削除・ステータス管理）
@@ -26,8 +25,6 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   // deletingId = 削除確認中の企業id（その行だけ「削除しますか？」を出す）
   const [deletingId, setDeletingId] = useState(null);
-  // 検索結果に担当代理店名を見せるか（運営が切り替える設定）
-  const [showAgency, setShowAgency] = useState(false);
 
   useEffect(() => {
     const current = getCurrentUser();
@@ -41,14 +38,7 @@ export default function AdminPage() {
     }
     setUser(current);
     loadAll();
-    getShowAgencyName().then(setShowAgency);
   }, []);
-
-  // 「代理店名を見せる」設定を切り替える
-  async function toggleShowAgency(value) {
-    setShowAgency(value); // 画面を先に更新
-    await setShowAgencyName(value);
-  }
 
   // 全企業＋登録した代理店名を取ってくる
   async function loadAll() {
@@ -123,19 +113,9 @@ export default function AdminPage() {
           </Link>
         </nav>
 
-        <h1 className="text-xl font-bold text-navy mb-4">
+        <h1 className="text-xl font-bold text-navy mb-6">
           運営管理画面（全{companies.length}件）
         </h1>
-
-        {/* 設定：検索結果に担当代理店名を見せるか */}
-        <label className="flex items-center gap-2 mb-6 text-sm bg-white rounded shadow px-4 py-3 w-fit">
-          <input
-            type="checkbox"
-            checked={showAgency}
-            onChange={(e) => toggleShowAgency(e.target.checked)}
-          />
-          代理店の検索結果に「担当代理店名」を表示する
-        </label>
 
         {loading ? (
           <p className="text-slate-500">読み込み中...</p>
