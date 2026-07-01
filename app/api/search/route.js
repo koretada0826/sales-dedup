@@ -12,8 +12,11 @@ import { getAuthedUser } from "@/lib/apiAuth";
 import {
   normalizeCompanyName,
   normalizePhoneNumber,
-  judgeCompanies,
+  judgeProposalAvailability,
 } from "@/lib/judge";
+
+// 判定の厳しさ順（数字が大きいほど厳しい）
+const SEVERITY = { NG: 3, 運営確認: 2, OK: 1 };
 
 export async function POST(request) {
   // 1) ログイン済みの本人か確認
@@ -22,18 +25,21 @@ export async function POST(request) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
 
-  const { companyName, phoneNumber, representativeName, address } =
+  const { companyName, phoneNumber, representativeName, address, requireTwo } =
     await request.json();
 
-  // 2項目以上の入力を必須にする（重複判定の精度確保）
+  // 検索ページからの呼び出し(requireTwo=true)のときだけ「2項目以上」を必須にする
   const filledCount = [companyName, phoneNumber, representativeName, address]
     .filter((v) => v && String(v).trim())
     .length;
-  if (filledCount < 2) {
+  if (requireTwo && filledCount < 2) {
     return NextResponse.json(
       { error: "2項目以上を入力してください" },
       { status: 400 }
     );
+  }
+  if (filledCount < 1) {
+    return NextResponse.json({ error: "検索条件が空です" }, { status: 400 });
   }
 
   // 2) 検索条件を組み立てる（電話・社名はそうじ版で一致、代表者・住所は部分一致）
@@ -54,8 +60,41 @@ export async function POST(request) {
     .or(conditions.join(","))
     .order("meeting_date", { ascending: false });
 
-  // 4) 全ヒットをまとめて判定（一番厳しい結果を採用）
-  const { judgement, company } = judgeCompanies(data || []);
+  // 4) 企業ごとに「何項目一致したか」を数えて判定する
+  //   ・1項目だけ一致 → 確信が弱いので「運営確認」に緩和
+  //   ・2項目以上一致 → ほぼ同一企業なので通常判定（NGになりうる）
+  const contains = (needle, hay) =>
+    needle && hay && String(hay).toLowerCase().includes(String(needle).toLowerCase());
+
+  let best = {
+    result: "OK",
+    message: "この企業は登録されていません。提案可能です。",
+    company: null,
+  };
+
+  for (const c of data || []) {
+    let matchCount = 0;
+    if (normPhone && c.normalized_phone_number === normPhone) matchCount++;
+    if (normName && c.normalized_company_name === normName) matchCount++;
+    if (representativeName && contains(representativeName, c.representative_name)) matchCount++;
+    if (address && contains(address, c.address)) matchCount++;
+    if (matchCount === 0) continue;
+
+    const base = judgeProposalAvailability(c); // NG か 運営確認
+    let result, message;
+    if (matchCount >= 2) {
+      result = base.result;
+      message = base.message;
+    } else {
+      // 1項目だけの一致
+      result = "運営確認";
+      message = "1項目のみ一致しました。同一企業かどうか運営にご確認ください。";
+    }
+
+    if (SEVERITY[result] > SEVERITY[best.result]) {
+      best = { result, message, company: c };
+    }
+  }
 
   // 5) 検索履歴を残す（誰が・何を・どう判定されたか）
   await supabaseAdmin.from("search_logs").insert({
@@ -63,23 +102,23 @@ export async function POST(request) {
     search_company_name: companyName || null,
     search_phone_number: phoneNumber || null,
     search_address: address || null,
-    result: judgement.result,
+    result: best.result,
   });
 
   // 6) ブラウザには「判定結果＋最小限の情報」だけ返す（他社の生データは渡さない）
   const minimal =
-    company && judgement.result !== "OK"
+    best.company && best.result !== "OK"
       ? {
-          company_name: company.company_name,
-          meeting_date: company.meeting_date,
-          current_status: company.current_status,
-          delivery_flag: company.delivery_flag,
+          company_name: best.company.company_name,
+          meeting_date: best.company.meeting_date,
+          current_status: best.company.current_status,
+          delivery_flag: best.company.delivery_flag,
         }
       : null;
 
   return NextResponse.json({
-    result: judgement.result,
-    message: judgement.message,
+    result: best.result,
+    message: best.message,
     company: minimal,
   });
 }

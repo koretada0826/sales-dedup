@@ -64,6 +64,7 @@ export default function CheckPage() {
         phoneNumber,
         representativeName,
         address,
+        requireTwo: true,
       }),
     });
 
@@ -158,7 +159,9 @@ export default function CheckPage() {
           </div>
 
           <p className="text-xs text-slate-600">
-            ※ 2項目以上を入力してください。1項目でも既存企業と一致した場合は「提案不可（NG）」または「運営確認」になります。
+            ※ 2項目以上を入力してください。<br />
+            ・1項目だけ既存企業と一致 → 「運営確認」<br />
+            ・2項目以上一致 → 「提案不可（NG）」（商談状況により運営確認の場合あり）
           </p>
           <button
             type="submit"
