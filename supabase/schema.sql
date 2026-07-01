@@ -80,9 +80,12 @@ create policy companies_select on companies for select
 drop policy if exists companies_insert on companies;
 create policy companies_insert on companies for insert
   with check (agency_id = auth.uid());
--- companies：変更・削除＝運営だけ
+-- companies：変更＝自分の企業 or 運営（with checkで他人への付け替えを防ぐ）
 drop policy if exists companies_update on companies;
-create policy companies_update on companies for update using (public.is_admin());
+create policy companies_update on companies for update
+  using (agency_id = auth.uid() or public.is_admin())
+  with check (agency_id = auth.uid() or public.is_admin());
+-- companies：削除＝運営だけ
 drop policy if exists companies_delete on companies;
 create policy companies_delete on companies for delete using (public.is_admin());
 
