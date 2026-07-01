@@ -201,20 +201,25 @@ export default function RegisterPage() {
             />
           </Field>
 
-          <Field label="代表者名">
+          <Field label="代表者名（カタカナで入力）">
             <input
               value={form.representative_name}
               onChange={(e) => updateField("representative_name", e.target.value)}
               className="w-full border rounded px-3 py-2"
+              placeholder="例：ヤマダタロウ"
             />
           </Field>
 
-          <Field label="住所">
+          <Field label="住所（丁目まで）">
             <input
               value={form.address}
               onChange={(e) => updateField("address", e.target.value)}
               className="w-full border rounded px-3 py-2"
+              placeholder="例：東京都豊島区池袋1丁目"
             />
+            <p className="text-xs text-slate-500 mt-1">
+              ※ 番地・建物名は入れず、丁目までを入力してください
+            </p>
           </Field>
 
           <Field label="商談日（必須）">

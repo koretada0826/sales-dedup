@@ -35,8 +35,12 @@ export default function CheckPage() {
 
   async function handleSearch(event) {
     event.preventDefault();
-    if (!companyName && !phoneNumber && !representativeName && !address) {
-      alert("いずれか1つ以上を入力してください。");
+    // 重複判定の精度を上げるため、2項目以上の入力を必須にする
+    const filledCount = [companyName, phoneNumber, representativeName, address]
+      .filter((v) => v && v.trim())
+      .length;
+    if (filledCount < 2) {
+      alert("2項目以上を入力してください（重複を正しく判定するため）。");
       return;
     }
     setSearching(true);
@@ -129,23 +133,33 @@ export default function CheckPage() {
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">代表者名</label>
+            <label className="block text-sm font-medium mb-1">代表者名（カタカナで入力）</label>
             <input
               value={representativeName}
               onChange={(e) => setRepresentativeName(e.target.value)}
               className="w-full border rounded px-3 py-2"
-              placeholder="山田 太郎"
+              placeholder="例：ヤマダタロウ"
             />
+            <p className="text-xs text-slate-500 mt-1">
+              ※ 代表者名はカタカナで入力してください
+            </p>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">住所</label>
+            <label className="block text-sm font-medium mb-1">住所（丁目まで）</label>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               className="w-full border rounded px-3 py-2"
-              placeholder="東京都〇〇区..."
+              placeholder="例：東京都豊島区池袋1丁目"
             />
+            <p className="text-xs text-slate-500 mt-1">
+              ※ 番地・建物名は入れず、丁目までを入力してください（例：東京都豊島区池袋1丁目）
+            </p>
           </div>
+
+          <p className="text-xs text-slate-600">
+            ※ 2項目以上を入力してください。1項目でも既存企業と一致した場合は「提案不可（NG）」または「運営確認」になります。
+          </p>
           <button
             type="submit"
             disabled={searching}

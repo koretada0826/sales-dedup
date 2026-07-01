@@ -25,8 +25,15 @@ export async function POST(request) {
   const { companyName, phoneNumber, representativeName, address } =
     await request.json();
 
-  if (!companyName && !phoneNumber && !representativeName && !address) {
-    return NextResponse.json({ error: "検索条件が空です" }, { status: 400 });
+  // 2項目以上の入力を必須にする（重複判定の精度確保）
+  const filledCount = [companyName, phoneNumber, representativeName, address]
+    .filter((v) => v && String(v).trim())
+    .length;
+  if (filledCount < 2) {
+    return NextResponse.json(
+      { error: "2項目以上を入力してください" },
+      { status: 400 }
+    );
   }
 
   // 2) 検索条件を組み立てる（電話・社名はそうじ版で一致、代表者・住所は部分一致）
