@@ -179,13 +179,17 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-4">
-          <Field label="企業名（必須）">
+          <Field label="企業名（必須・カタカナで入力）">
             <input
               required
               value={form.company_name}
               onChange={(e) => updateField("company_name", e.target.value)}
               className="w-full border rounded px-3 py-2"
+              placeholder="例：テレモ（英字ではなくカタカナで）"
             />
+            <p className="text-xs text-slate-500 mt-1">
+              ※ 重複を正しく防ぐため、企業名は必ずカタカナで入力してください（例：TELEMO → テレモ）
+            </p>
           </Field>
 
           <Field label="代表電話番号">

@@ -117,13 +117,16 @@ export default function CheckPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">企業名</label>
+            <label className="block text-sm font-medium mb-1">企業名（カタカナで入力）</label>
             <input
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="w-full border rounded px-3 py-2"
-              placeholder="株式会社〇〇"
+              placeholder="例：テレモ（英字ではなくカタカナで）"
             />
+            <p className="text-xs text-slate-500 mt-1">
+              ※ 企業名はカタカナで検索してください（例：TELEMO → テレモ）
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">代表者名</label>
